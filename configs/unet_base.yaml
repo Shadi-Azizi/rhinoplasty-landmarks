@@ -1,0 +1,4 @@
+data_root: /content/drive/MyDrive/rhino-landmarks-data
+image_size: [512, 512]
+landmarks: [glabella, nasion, pronasale, subnasale, SL, LTD, RTD, l_alare, r_alare, menton]
+heatmap_sigma: 3
