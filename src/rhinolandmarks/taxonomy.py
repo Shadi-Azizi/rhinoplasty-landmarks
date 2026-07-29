@@ -54,3 +54,16 @@ def landmarks_for(view_family):
 def total_channels():
     """Sum of channels across all 5 view-family heads (sanity-check number)."""
     return sum(len(v) for v in VIEW_LANDMARKS.values())
+
+# Per-view-family reference landmark pair for NME normalization.
+# glabella-subnasale is an established anthropometric distance (facial
+# "middle third"); alare-alare is standard nasal base width. glabella-SL
+# for superior has no direct literature precedent — flagged as a
+# methodological choice to justify explicitly in the paper.
+NORM_LANDMARK_PAIRS = {
+    "frontal":  ("l_alare", "r_alare"),
+    "basal":    ("l_alare", "r_alare"),
+    "lateral":  ("glabella", "subnasale"),
+    "oblique":  ("glabella", "subnasale"),
+    "superior": ("glabella", "SL"),
+}
