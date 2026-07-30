@@ -72,7 +72,7 @@ def evaluate(model, loader, loss_fn, device, view_family, landmark_order, norm_p
     return avg_loss, avg_nme
 
 
-def main(config_path):
+def main(config_path, resume=False):
     with open(config_path, "r") as f:
         cfg = yaml.safe_load(f)
 
@@ -106,20 +106,37 @@ def main(config_path):
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg["learning_rate"],
                                   weight_decay=cfg["weight_decay"])
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=8)
-
     checkpoint_dir = Path(cfg["checkpoint_dir"])
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     
     history_path = checkpoint_dir / f"unet_{view_family}_history.csv"
-    history_file = open(history_path, "w", newline="")
+    history_mode = "a" if (resume and history_path.exists()) else "w"
+    history_file = open(history_path, history_mode, newline="")
     history_writer = csv.writer(history_file)
-    history_writer.writerow(["epoch", "train_loss", "val_loss", "val_nme", "lr"])
+    if history_mode == "w":
+        history_writer.writerow(["epoch", "train_loss", "val_loss", "val_nme", "lr"])
     best_ckpt_path = checkpoint_dir / f"unet_{view_family}_best.pt"
 
+
+    start_epoch = 1
     best_val_nme = float("inf")
     epochs_without_improvement = 0
 
-    for epoch in range(1, cfg["num_epochs"] + 1):
+    if resume and best_ckpt_path.exists():
+        print(f"Resuming from checkpoint: {best_ckpt_path}")
+        checkpoint = torch.load(best_ckpt_path, map_location=device)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        start_epoch = checkpoint["epoch"] + 1
+        best_val_nme = checkpoint["val_nme"]
+        print(f"  Resuming at epoch {start_epoch}, best_val_NME so far: {best_val_nme:.4f}")
+    elif resume:
+        print("--resume was set but no checkpoint found. Starting fresh.")
+
+
+    
+
+    for epoch in range(start_epoch, cfg["num_epochs"] + 1):
         model.train()
         train_loss_total = 0.0
         n_batches = 0
@@ -155,6 +172,7 @@ def main(config_path):
             epochs_without_improvement = 0
             torch.save({
                 "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
                 "epoch": epoch,
                 "val_nme": val_nme,
                 "config": cfg,
@@ -174,5 +192,6 @@ def main(config_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True)
+    parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint if it exists")
     args = parser.parse_args()
-    main(args.config)
+    main(args.config, resume=args.resume)
