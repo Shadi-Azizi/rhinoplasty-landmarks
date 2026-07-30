@@ -1,7 +1,7 @@
 import argparse
 import random
 from pathlib import Path
-
+import csv
 import numpy as np
 import torch
 import yaml
@@ -109,6 +109,11 @@ def main(config_path):
 
     checkpoint_dir = Path(cfg["checkpoint_dir"])
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    
+    history_path = checkpoint_dir / f"unet_{view_family}_history.csv"
+    history_file = open(history_path, "w", newline="")
+    history_writer = csv.writer(history_file)
+    history_writer.writerow(["epoch", "train_loss", "val_loss", "val_nme", "lr"])
     best_ckpt_path = checkpoint_dir / f"unet_{view_family}_best.pt"
 
     best_val_nme = float("inf")
@@ -142,6 +147,8 @@ def main(config_path):
         print(f"Epoch {epoch:3d}/{cfg['num_epochs']}  "
               f"train_loss={avg_train_loss:.4f}  val_loss={val_loss:.4f}  "
               f"val_NME={val_nme:.4f}  lr={current_lr:.2e}")
+        history_writer.writerow([epoch, avg_train_loss, val_loss, val_nme, current_lr])
+        history_file.flush()
 
         if val_nme < best_val_nme:
             best_val_nme = val_nme
@@ -160,6 +167,7 @@ def main(config_path):
                       f"{cfg['early_stopping_patience']} epochs).")
                 break
 
+    history_file.close()
     print(f"Training complete. Best val_NME={best_val_nme:.4f}, checkpoint at {best_ckpt_path}")
 
 
