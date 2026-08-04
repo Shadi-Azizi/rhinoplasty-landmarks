@@ -15,7 +15,7 @@ def parse_labelme_json(json_path):
     view_family, needs_flip = get_view_family(folder_name)
     expected_landmarks = landmarks_for(view_family)
 
-    with open(json_path, "r") as f:
+    with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     image_width = data["imageWidth"]
