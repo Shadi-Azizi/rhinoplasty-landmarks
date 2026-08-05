@@ -10,7 +10,6 @@ from rhinolandmarks.datasets.splits import get_split_json_paths
 from rhinolandmarks.utils.metrics import heatmaps_to_coords, compute_nme
 from rhinolandmarks.taxonomy import landmarks_for, NORM_LANDMARK_PAIRS
 
-# EDIT: one config file per view family, already trained
 CONFIG_PATHS = [
     "configs/unet_frontal.yaml",
     "configs/unet_basal.yaml",
@@ -19,16 +18,12 @@ CONFIG_PATHS = [
     "configs/unet_superior.yaml",
 ]
 
-PCK_THRESHOLDS = [0.05, 0.10, 0.20]  # fraction of normalization distance
+PCK_THRESHOLDS = [0.05, 0.10, 0.20]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def compute_pck(pred_coords, gt_coords, visible, landmark_order, norm_pair, thresholds):
-    """
-    Returns dict: threshold -> array of 0/1 per visible landmark (correct/not),
-    or None per landmark if it wasn't visible. Same normalization logic as NME.
-    """
     idx_a = landmark_order.index(norm_pair[0])
     idx_b = landmark_order.index(norm_pair[1])
     if visible[idx_a] == 0 or visible[idx_b] == 0:
@@ -39,7 +34,7 @@ def compute_pck(pred_coords, gt_coords, visible, landmark_order, norm_pair, thre
         return None
 
     per_landmark_error = np.linalg.norm(pred_coords - gt_coords, axis=1) / norm_dist
-    return per_landmark_error  # per-landmark NORMALIZED error, used for PCK thresholds below
+    return per_landmark_error
 
 
 def evaluate_view(config_path):
@@ -74,13 +69,14 @@ def evaluate_view(config_path):
     print(f"\n{view_family}: {len(test_ds)} test images, checkpoint epoch {checkpoint['epoch']}, "
           f"val_NME={checkpoint['val_nme']:.4f}")
 
-    # Collect per-image, per-landmark normalized error
-    all_errors = []       # list of (image_idx, landmark_name, normalized_error)
-    image_nmes = []        # per-image scalar NME (mean over visible landmarks)
+    all_errors = []       # (image_stem, landmark_name, normalized_error)
+    image_nmes = []
 
     with torch.no_grad():
         for i in range(len(test_ds)):
             sample = test_ds[i]
+            image_stem = Path(sample["json_path"]).stem
+
             image = sample["image"].unsqueeze(0).to(device)
             gt_heatmaps = sample["heatmaps"]
             visible = sample["visible"].numpy()
@@ -94,19 +90,18 @@ def evaluate_view(config_path):
             per_landmark_norm_error = compute_pck(pred_coords, gt_coords, visible,
                                                    landmark_order, norm_pair, PCK_THRESHOLDS)
             if per_landmark_norm_error is None:
-                continue  # normalization landmarks not visible this image — excluded
+                continue
 
             for c, name in enumerate(landmark_order):
                 if visible[c] == 1:
-                    all_errors.append((i, name, per_landmark_norm_error[c]))
+                    all_errors.append((image_stem, name, per_landmark_norm_error[c]))
 
             img_nme = compute_nme(pred_coords, gt_coords, visible, landmark_order, norm_pair)
             if img_nme is not None:
                 image_nmes.append(img_nme)
 
-    err_df = pd.DataFrame(all_errors, columns=["image_idx", "landmark", "normalized_error"])
+    err_df = pd.DataFrame(all_errors, columns=["image", "landmark", "normalized_error"])
 
-    # --- Per-landmark stats ---
     landmark_stats = err_df.groupby("landmark")["normalized_error"].agg(
         mean="mean", median="median", std="std",
         q25=lambda x: x.quantile(0.25), q75=lambda x: x.quantile(0.75),
@@ -121,9 +116,10 @@ def evaluate_view(config_path):
         landmark_stats[f"pck@{t}"] = landmark_stats["landmark"].map(pck_per_landmark)
 
     landmark_stats.insert(0, "view_family", view_family)
+    landmark_stats.insert(0, "model", "unet")
 
-    # --- Per-view (aggregate) stats ---
     view_row = {
+        "model": "unet",
         "view_family": view_family,
         "n_test_images": len(test_ds),
         "n_evaluated_images": len(image_nmes),
