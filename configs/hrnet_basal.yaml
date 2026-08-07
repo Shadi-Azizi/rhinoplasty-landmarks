@@ -1,0 +1,22 @@
+data_root: /content/drive/MyDrive/Rhinoplasty_Landmark/views-02
+split_path: /content/drive/MyDrive/Rhinoplasty_Landmark/patient_split.csv   
+
+model_name: hrnet
+view_family: basal
+view_folders: [basal]
+
+image_size: [512, 640]
+heatmap_size: [128, 160]
+heatmap_sigma: 2.5
+
+base_channels: 32
+
+batch_size: 8
+num_epochs: 150
+learning_rate: 0.0003
+weight_decay: 0.00001
+early_stopping_patience: 20
+num_workers: 2
+
+checkpoint_dir: /content/drive/MyDrive/rhino-landmarks-data/checkpoints
+seed: 42

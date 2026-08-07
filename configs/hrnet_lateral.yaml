@@ -1,0 +1,30 @@
+# Data
+data_root: /content/drive/MyDrive/Rhinoplasty_Landmark/views-02   # EDIT to your actual Drive path
+split_path: /content/drive/MyDrive/Rhinoplasty_Landmark/patient_split.csv   # relative to repo root, committed to git
+
+# View family this run trains for — one of:
+# frontal, basal, lateral, oblique, superior
+view_family: lateral
+# Folder(s) under data_root belonging to this view family.
+# lateral/oblique need BOTH left and right folders merged (mirror pairs).
+view_folders: [lateral_left, lateral_right]
+
+# Image / heatmap
+image_size: [512, 640]      # width, height
+heatmap_size: [128, 160]    # width, height
+heatmap_sigma: 2.5
+
+# Model
+base_channels: 32
+
+# Training
+batch_size: 8
+num_epochs: 150
+learning_rate: 0.0003
+weight_decay: 0.00001
+early_stopping_patience: 20
+num_workers: 2
+
+# Output
+checkpoint_dir: /content/drive/MyDrive/rhino-landmarks-data/checkpoints
+seed: 42

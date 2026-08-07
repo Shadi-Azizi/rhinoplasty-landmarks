@@ -99,7 +99,8 @@ def main(config_path, resume=False):
     val_loader = DataLoader(val_ds, batch_size=cfg["batch_size"], shuffle=False,
                              num_workers=cfg["num_workers"], pin_memory=True)
 
-    model = build_model("unet", in_channels=3, out_channels=num_channels,
+    model_name = cfg.get("model_name", "unet")  # defaults to unet if not specified, for backward compatibility
+    model = build_model(model_name, in_channels=3, out_channels=num_channels,
                          base_channels=cfg["base_channels"]).to(device)
 
     loss_fn = MaskedHeatmapMSELoss()
@@ -109,14 +110,13 @@ def main(config_path, resume=False):
     checkpoint_dir = Path(cfg["checkpoint_dir"])
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     
-    history_path = checkpoint_dir / f"unet_{view_family}_history.csv"
+    history_path = checkpoint_dir / f"{model_name}_{view_family}_history.csv"
     history_mode = "a" if (resume and history_path.exists()) else "w"
     history_file = open(history_path, history_mode, newline="")
     history_writer = csv.writer(history_file)
     if history_mode == "w":
         history_writer.writerow(["epoch", "train_loss", "val_loss", "val_nme", "lr"])
-    best_ckpt_path = checkpoint_dir / f"unet_{view_family}_best.pt"
-
+    best_ckpt_path = checkpoint_dir / f"{model_name}_{view_family}_best.pt"
 
     start_epoch = 1
     best_val_nme = float("inf")

@@ -1,7 +1,9 @@
 from .unet import UNet
+from .hrnet import HRNetLite
 
 MODEL_REGISTRY = {
     "unet": UNet,
+    "hrnet": HRNetLite,
 }
 
 
