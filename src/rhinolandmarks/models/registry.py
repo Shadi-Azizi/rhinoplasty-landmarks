@@ -1,9 +1,9 @@
 from .unet import UNet
-from .hrnet import HRNetLite
+from .unet_pretrained import UNetResNet34
 
 MODEL_REGISTRY = {
     "unet": UNet,
-    "hrnet": HRNetLite,
+    "unet_resnet34": UNetResNet34,
 }
 
 

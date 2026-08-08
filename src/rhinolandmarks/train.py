@@ -100,8 +100,12 @@ def main(config_path, resume=False):
                              num_workers=cfg["num_workers"], pin_memory=True)
 
     model_name = cfg.get("model_name", "unet")  # defaults to unet if not specified, for backward compatibility
-    model = build_model(model_name, in_channels=3, out_channels=num_channels,
-                         base_channels=cfg["base_channels"]).to(device)
+    if model_name == "unet_resnet34":
+        model = build_model(model_name, in_channels=3, out_channels=num_channels,
+                             pretrained=True).to(device)
+    else:
+        model = build_model(model_name, in_channels=3, out_channels=num_channels,
+                             base_channels=cfg["base_channels"]).to(device)
 
     loss_fn = MaskedHeatmapMSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg["learning_rate"],
