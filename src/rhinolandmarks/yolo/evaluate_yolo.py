@@ -19,8 +19,8 @@ from rhinolandmarks.datasets.splits import get_split_json_paths
 from rhinolandmarks.utils.metrics import compute_nme
 from rhinolandmarks.taxonomy import landmarks_for, NORM_LANDMARK_PAIRS, FOLDER_TO_VIEW_FAMILY
 
-DATA_ROOT = Path("/content/drive/MyDrive/rhino-landmarks-data/views-02")
-SPLIT_PATH = Path("/content/rhinoplasty-landmarks/data/splits/patient_split.csv")
+DATA_ROOT = Path("/content/drive/MyDrive/Rhinoplasty_Landmark/views-02")
+SPLIT_PATH = Path("/content/drive/MyDrive/Rhinoplasty_Landmark/patient_split.csv")
 YOLO_DATA_ROOT = Path("/content/drive/MyDrive/rhino-landmarks-data/yolo-data")
 
 # Maps --variant argument -> (weights folder, model label used in output CSVs)
