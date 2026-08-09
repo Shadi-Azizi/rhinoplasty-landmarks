@@ -1,8 +1,13 @@
 """
-Runs a trained YOLOv8-pose model on its view family's test set, and scores
-predictions using the SAME NME/PCK code (utils/metrics.py) used for the
-U-Net models — this is what makes the two paradigms directly comparable.
+Runs a trained YOLOv8-pose model (pretrained OR scratch-initialized) on
+its view family's test set, scored using the SAME NME/PCK code used for
+the U-Net models.
+
+Usage:
+    python -m rhinolandmarks.yolo.evaluate_yolo --variant pretrained
+    python -m rhinolandmarks.yolo.evaluate_yolo --variant scratch
 """
+import argparse
 import numpy as np
 import pandas as pd
 import torch
@@ -14,10 +19,23 @@ from rhinolandmarks.datasets.splits import get_split_json_paths
 from rhinolandmarks.utils.metrics import compute_nme
 from rhinolandmarks.taxonomy import landmarks_for, NORM_LANDMARK_PAIRS, FOLDER_TO_VIEW_FAMILY
 
-DATA_ROOT = Path("/content/drive/MyDrive/Rhinoplasty_Landmark/views-02")   # original JSONs, for ground truth
-SPLIT_PATH = Path("/content/drive/MyDrive/Rhinoplasty_Landmark/patient_split.csv")
-YOLO_RUNS_ROOT = Path("/content/drive/MyDrive/rhino-landmarks-data/yolo-runs")
+DATA_ROOT = Path("/content/drive/MyDrive/rhino-landmarks-data/views-02")
+SPLIT_PATH = Path("/content/rhinoplasty-landmarks/data/splits/patient_split.csv")
 YOLO_DATA_ROOT = Path("/content/drive/MyDrive/rhino-landmarks-data/yolo-data")
+
+# Maps --variant argument -> (weights folder, model label used in output CSVs)
+VARIANT_CONFIG = {
+    "pretrained": {
+        "runs_root": Path("/content/drive/MyDrive/rhino-landmarks-data/yolo-runs"),
+        "model_label": "yolov8n-pose",
+        "output_prefix": "yolo",
+    },
+    "scratch": {
+        "runs_root": Path("/content/drive/MyDrive/rhino-landmarks-data/yolo-runs-scratch"),
+        "model_label": "yolov8n-pose-scratch",
+        "output_prefix": "yolo_scratch",
+    },
+}
 
 PCK_THRESHOLDS = [0.05, 0.10, 0.20]
 
@@ -26,11 +44,11 @@ for folder, (vf, _) in FOLDER_TO_VIEW_FAMILY.items():
     VIEW_TO_FOLDERS.setdefault(vf, []).append(folder)
 
 
-def evaluate_view(view_family):
+def evaluate_view(view_family, runs_root, model_label):
     landmark_order = landmarks_for(view_family)
     norm_pair = NORM_LANDMARK_PAIRS[view_family]
 
-    weights_path = YOLO_RUNS_ROOT / view_family / "weights" / "best.pt"
+    weights_path = runs_root / view_family / "weights" / "best.pt"
     model = YOLO(str(weights_path))
 
     test_img_dir = YOLO_DATA_ROOT / view_family / "images" / "test"
@@ -40,9 +58,6 @@ def evaluate_view(view_family):
     for img_path in sorted(test_img_dir.glob("*.jpg")):
         stem = img_path.stem
 
-        # Ground truth: re-parse the ORIGINAL labelme json (same source used
-        # to build the U-Net's targets), so both paradigms are scored
-        # against identically-defined ground truth.
         orig_json_path = None
         for folder in VIEW_TO_FOLDERS[view_family]:
             candidate = DATA_ROOT / folder / f"{stem}.json"
@@ -50,7 +65,6 @@ def evaluate_view(view_family):
                 orig_json_path = candidate
                 break
         if orig_json_path is None:
-            print(f"WARNING: no matching original json for {stem}, skipping")
             continue
 
         parsed = parse_labelme_json(orig_json_path)
@@ -61,18 +75,16 @@ def evaluate_view(view_family):
                 gt_coords[c] = parsed["points"][name]
                 visible[c] = 1.0
 
-        # Prediction
         result = model.predict(source=str(img_path), verbose=False)[0]
         if result.keypoints is None or len(result.keypoints.xy) == 0:
-            continue  # no detection at all for this image
+            continue
 
-        # Highest-confidence detection (should normally be the only one, single-instance-per-image design)
         if result.boxes is not None and len(result.boxes.conf) > 0:
             best_idx = int(result.boxes.conf.argmax())
         else:
             best_idx = 0
 
-        pred_coords = result.keypoints.xy[best_idx].cpu().numpy()  # (num_kpts, 2), already in ORIGINAL image pixel space
+        pred_coords = result.keypoints.xy[best_idx].cpu().numpy()
 
         nme = compute_nme(pred_coords, gt_coords, visible, landmark_order, norm_pair)
         if nme is not None:
@@ -97,10 +109,10 @@ def evaluate_view(view_family):
         pck = err_df.groupby("landmark")["normalized_error"].apply(lambda x: (x <= t).mean())
         landmark_stats[f"pck@{t}"] = landmark_stats["landmark"].map(pck)
     landmark_stats.insert(0, "view_family", view_family)
-    landmark_stats.insert(0, "model", "yolov8n-pose")
+    landmark_stats.insert(0, "model", model_label)
 
     view_row = {
-        "model": "yolov8n-pose",
+        "model": model_label,
         "view_family": view_family,
         "n_evaluated_images": len(image_nmes),
         "mean_NME": np.mean(image_nmes) if image_nmes else None,
@@ -113,14 +125,19 @@ def evaluate_view(view_family):
     return landmark_stats, view_row, err_df
 
 
-def main():
+def main(variant):
+    config = VARIANT_CONFIG[variant]
+    runs_root = config["runs_root"]
+    model_label = config["model_label"]
+    output_prefix = config["output_prefix"]
+
     all_landmark_stats, all_view_rows, all_raw = [], [], []
     for view_family in ["frontal", "basal", "lateral", "oblique", "superior"]:
-        weights_path = YOLO_RUNS_ROOT / view_family / "weights" / "best.pt"
+        weights_path = runs_root / view_family / "weights" / "best.pt"
         if not weights_path.exists():
-            print(f"Skipping {view_family} — no trained weights found yet.")
+            print(f"Skipping {view_family} — no trained weights found at {weights_path}")
             continue
-        landmark_stats, view_row, err_df = evaluate_view(view_family)
+        landmark_stats, view_row, err_df = evaluate_view(view_family, runs_root, model_label)
         all_landmark_stats.append(landmark_stats)
         all_view_rows.append(view_row)
         err_df["view_family"] = view_family
@@ -128,12 +145,15 @@ def main():
 
     out_dir = Path("/content/drive/MyDrive/rhino-landmarks-data/results")
     out_dir.mkdir(parents=True, exist_ok=True)
-    pd.concat(all_landmark_stats, ignore_index=True).to_csv(out_dir / "yolo_test_results_per_landmark.csv", index=False)
-    pd.DataFrame(all_view_rows).to_csv(out_dir / "yolo_test_results_per_view.csv", index=False)
-    pd.concat(all_raw, ignore_index=True).to_csv(out_dir / "yolo_test_results_raw_errors.csv", index=False)
+    pd.concat(all_landmark_stats, ignore_index=True).to_csv(out_dir / f"{output_prefix}_test_results_per_landmark.csv", index=False)
+    pd.DataFrame(all_view_rows).to_csv(out_dir / f"{output_prefix}_test_results_per_view.csv", index=False)
+    pd.concat(all_raw, ignore_index=True).to_csv(out_dir / f"{output_prefix}_test_results_raw_errors.csv", index=False)
 
     print(pd.DataFrame(all_view_rows).to_string(index=False))
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--variant", type=str, required=True, choices=["pretrained", "scratch"])
+    args = parser.parse_args()
+    main(args.variant)
