@@ -16,6 +16,11 @@ CONFIG_PATHS = [
     "configs/unet_lateral.yaml",
     "configs/unet_oblique.yaml",
     "configs/unet_superior.yaml",
+    "configs/unet_resnet34_frontal.yaml",
+    "configs/unet_resnet34_basal.yaml",
+    "configs/unet_resnet34_lateral.yaml",
+    "configs/unet_resnet34_oblique.yaml",
+    "configs/unet_resnet34_superior.yaml",
 ]
 
 PCK_THRESHOLDS = [0.05, 0.10, 0.20]
@@ -49,11 +54,16 @@ def evaluate_view(config_path):
     image_size = tuple(cfg["image_size"])
     heatmap_size = tuple(cfg["heatmap_size"])
 
-    ckpt_path = Path(cfg["checkpoint_dir"]) / f"unet_{view_family}_best.pt"
+    ckpt_path = Path(cfg["checkpoint_dir"]) / f"{model_name}_{view_family}_best.pt"
     checkpoint = torch.load(ckpt_path, map_location=device)
 
-    model = build_model("unet", in_channels=3, out_channels=num_channels,
-                         base_channels=cfg["base_channels"]).to(device)
+    model_name = cfg.get("model_name", "unet")
+    if model_name == "unet_resnet34":
+        model = build_model(model_name, in_channels=3, out_channels=num_channels,
+                             pretrained=True).to(device)
+    else:
+        model = build_model(model_name, in_channels=3, out_channels=num_channels,
+                             base_channels=cfg["base_channels"]).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
 
@@ -119,7 +129,7 @@ def evaluate_view(config_path):
     landmark_stats.insert(0, "model", "unet")
 
     view_row = {
-        "model": "unet",
+        "model": model_name,
         "view_family": view_family,
         "n_test_images": len(test_ds),
         "n_evaluated_images": len(image_nmes),
