@@ -1,9 +1,11 @@
 from .unet import UNet
 from .unet_pretrained import UNetResNet34
+from .hrnet_timm import HRNetW18
 
 MODEL_REGISTRY = {
     "unet": UNet,
     "unet_resnet34": UNetResNet34,
+    "hrnet_w18": HRNetW18,
 }
 
 

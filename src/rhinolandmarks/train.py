@@ -100,7 +100,7 @@ def main(config_path, resume=False):
                              num_workers=cfg["num_workers"], pin_memory=True)
 
     model_name = cfg.get("model_name", "unet")  # defaults to unet if not specified, for backward compatibility
-    if model_name == "unet_resnet34":
+    if model_name in ("unet_resnet34", "hrnet_w18"):
         model = build_model(model_name, in_channels=3, out_channels=num_channels,
                              pretrained=True).to(device)
     else:

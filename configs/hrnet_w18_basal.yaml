@@ -1,9 +1,9 @@
 data_root: /content/drive/MyDrive/Rhinoplasty_Landmark/views-02
 split_path: /content/drive/MyDrive/Rhinoplasty_Landmark/patient_split.csv   
 
-model_name: hrnet
-view_family: lateral
-view_folders: [lateral_left, lateral_right]
+model_name: hrnet_w18
+view_family: basal
+view_folders: [basal]
 
 image_size: [512, 640]
 heatmap_size: [128, 160]
