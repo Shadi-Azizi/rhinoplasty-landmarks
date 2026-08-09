@@ -17,7 +17,7 @@ YOLO_RUNS_ROOT = Path("/content/drive/MyDrive/rhino-landmarks-data/yolo-runs-scr
 # hasn't plateaued by 150 epochs, this should be extended and reported
 # as such (asymmetric budget, honestly justified) rather than silently
 # cut off. Larger patience gives it more room within the same ceiling.
-EPOCHS = 150
+EPOCHS = 300
 PATIENCE = 20
                         # to need longer to plateau; using the same tight patience as the
                         # pretrained run risks premature stopping before convergence
