@@ -21,6 +21,11 @@ CONFIG_PATHS = [
     "configs/unet_resnet34_lateral.yaml",
     "configs/unet_resnet34_oblique.yaml",
     "configs/unet_resnet34_superior.yaml",
+    "configs/hrnet_w18_frontal.yaml",
+    "configs/hrnet_w18_basal.yaml",
+    "configs/hrnet_w18_lateral.yaml",
+    "configs/hrnet_w18_oblique.yaml",
+    "configs/hrnet_w18_superior.yaml",
 ]
 
 PCK_THRESHOLDS = [0.05, 0.10, 0.20]
@@ -54,11 +59,12 @@ def evaluate_view(config_path):
     image_size = tuple(cfg["image_size"])
     heatmap_size = tuple(cfg["heatmap_size"])
 
+    model_name = cfg.get("model_name", "unet")   # <-- moved BEFORE ckpt_path, fixes NameError
+
     ckpt_path = Path(cfg["checkpoint_dir"]) / f"{model_name}_{view_family}_best.pt"
     checkpoint = torch.load(ckpt_path, map_location=device)
 
-    model_name = cfg.get("model_name", "unet")
-    if model_name == "unet_resnet34":
+    if model_name in ("unet_resnet34", "hrnet_w18"):   # <-- hrnet_w18 added
         model = build_model(model_name, in_channels=3, out_channels=num_channels,
                              pretrained=True).to(device)
     else:
@@ -76,10 +82,10 @@ def evaluate_view(config_path):
     test_ds = ViewLandmarkDataset(test_json_paths, image_size=image_size,
                                    heatmap_size=heatmap_size, sigma=cfg["heatmap_sigma"])
 
-    print(f"\n{view_family}: {len(test_ds)} test images, checkpoint epoch {checkpoint['epoch']}, "
-          f"val_NME={checkpoint['val_nme']:.4f}")
+    print(f"\n{model_name} | {view_family}: {len(test_ds)} test images, "
+          f"checkpoint epoch {checkpoint['epoch']}, val_NME={checkpoint['val_nme']:.4f}")
 
-    all_errors = []       # (image_stem, landmark_name, normalized_error)
+    all_errors = []
     image_nmes = []
 
     with torch.no_grad():
@@ -126,7 +132,7 @@ def evaluate_view(config_path):
         landmark_stats[f"pck@{t}"] = landmark_stats["landmark"].map(pck_per_landmark)
 
     landmark_stats.insert(0, "view_family", view_family)
-    landmark_stats.insert(0, "model", "unet")
+    landmark_stats.insert(0, "model", model_name)   # <-- fixed, was hardcoded "unet"
 
     view_row = {
         "model": model_name,
@@ -155,6 +161,7 @@ def main():
         all_landmark_stats.append(landmark_stats)
         all_view_rows.append(view_row)
         err_df["view_family"] = view_row["view_family"]
+        err_df["model"] = view_row["model"]   # tag raw errors with model too, needed for later merges
         all_raw_errors.append(err_df)
 
     landmark_table = pd.concat(all_landmark_stats, ignore_index=True)
