@@ -141,6 +141,7 @@ def main(variant):
         all_landmark_stats.append(landmark_stats)
         all_view_rows.append(view_row)
         err_df["view_family"] = view_family
+        err_df["model"] = model_label          # <-- FIX: was missing, broke the multi-model merge
         all_raw.append(err_df)
 
     out_dir = Path("/content/drive/MyDrive/rhino-landmarks-data/results")
